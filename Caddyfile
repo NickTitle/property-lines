@@ -1,0 +1,10 @@
+{
+	auto_https disable_redirects
+}
+
+# Example reverse-proxy config.
+# Replace the hostname and TLS setup to match your environment.
+property-lines.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:4190
+}

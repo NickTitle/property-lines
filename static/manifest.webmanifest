@@ -1,0 +1,9 @@
+{
+  "name": "Property Lines",
+  "short_name": "Property Lines",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f4",
+  "theme_color": "#1d6f4c"
+}

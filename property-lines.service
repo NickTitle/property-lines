@@ -1,0 +1,18 @@
+[Unit]
+Description=Property Lines parcel boundary web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Replace the user, group, working directory, and binary path for your host.
+User=property-lines
+Group=property-lines
+WorkingDirectory=/opt/property-lines
+Environment=PORT=4190
+ExecStart=/opt/property-lines/bin/property-lines
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Property Lines</title>
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="map-stage" aria-label="Property map">
+        <div id="map" class="map"></div>
+        <div class="map-status" id="status">Ready. Use GPS or query from the map center.</div>
+      </section>
+
+      <aside class="control-panel" aria-label="Parcel controls">
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">GPS parcel viewer</p>
+            <h1>Property Lines</h1>
+          </div>
+          <span class="mode-pill">Not a survey</span>
+        </header>
+
+        <div class="action-grid">
+          <button class="button primary" id="locateButton" type="button">Use GPS</button>
+          <button class="button" id="centerButton" type="button">Use Map Center</button>
+          <button class="button accent" id="queryButton" type="button">Load Parcels</button>
+        </div>
+
+        <section class="panel-section">
+          <h2>Location</h2>
+          <div class="coordinate-grid">
+            <label>
+              Latitude
+              <input id="latitudeInput" inputmode="decimal" type="number" step="0.000001" value="41.933000">
+            </label>
+            <label>
+              Longitude
+              <input id="longitudeInput" inputmode="decimal" type="number" step="0.000001" value="-74.018600">
+            </label>
+          </div>
+          <p class="muted" id="accuracyText">Map starts at a New York sample location. Use GPS for your exact position.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2>Parcel Source</h2>
+          <label>
+            Manual ArcGIS parcel layer URL (optional)
+            <input id="serviceUrlInput" placeholder="Auto by location" spellcheck="false">
+          </label>
+          <div class="source-actions">
+            <button class="text-button" id="nysButton" type="button">Use NYS parcels</button>
+            <button class="text-button" id="demoButton" type="button">Use Ohio demo</button>
+            <a
+              class="text-link"
+              href="https://gisservices.its.ny.gov/arcgis/rest/services/NYS_Tax_Parcels_Public/MapServer/1"
+              rel="noreferrer"
+              target="_blank"
+            >Open NYS source</a>
+          </div>
+          <p class="muted" id="sourceStatus">Auto-selects parcel data from the current map area.</p>
+          <label>
+            Visible parcel cap
+            <input id="limitInput" max="500" min="1" step="25" type="number" value="300">
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>Offline Area Cache</h2>
+          <p class="muted">Cache the visible map area after zooming in. Browser storage is limited, so keep areas small.</p>
+          <div class="coordinate-grid">
+            <label>
+              Cache parcel cap
+              <input id="cacheLimitInput" max="500" min="25" step="25" type="number" value="300">
+            </label>
+            <label>
+              Cached areas
+              <input id="cacheCountInput" readonly value="0">
+            </label>
+          </div>
+          <div class="cache-actions">
+            <button class="button" id="cacheAreaButton" type="button">Cache Visible Area</button>
+            <button class="button" id="loadCacheButton" type="button">Load Cached Area</button>
+            <button class="button danger" id="clearCacheButton" type="button">Clear Cache</button>
+          </div>
+          <p class="muted" id="cacheStatus">No cached areas yet.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2>Offline Basemap Tiles</h2>
+          <p class="muted">Download OpenStreetMap tiles for the visible map. This is separate from parcel data.</p>
+          <div class="coordinate-grid">
+            <label>
+              Zoom levels
+              <input id="tileZoomLevelsInput" max="3" min="1" step="1" type="number" value="2">
+            </label>
+            <label>
+              Cached tiles
+              <input id="tileCacheCountInput" readonly value="0">
+            </label>
+          </div>
+          <div class="cache-actions">
+            <button class="button" id="cacheTilesButton" type="button">Cache Map Tiles</button>
+            <button class="button danger" id="clearTileCacheButton" type="button">Clear Tiles</button>
+          </div>
+          <p class="muted" id="tileCacheStatus">No map tiles cached yet.</p>
+        </section>
+
+        <section class="panel-section selected-panel" id="selectedPanel">
+          <h2>Selected Parcel</h2>
+          <div id="parcelSummary" class="parcel-summary empty">No parcel selected.</div>
+          <div id="attributeTable" class="attribute-table"></div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="/vendor/leaflet/leaflet.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
