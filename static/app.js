@@ -107,7 +107,7 @@ const map = L.map("map", { zoomControl: false }).setView(
   17,
 );
 
-L.control.zoom({ position: "bottomleft" }).addTo(map);
+L.control.zoom({ position: "topleft" }).addTo(map);
 setBasemap(currentBasemapId, { persist: false });
 
 function init() {
