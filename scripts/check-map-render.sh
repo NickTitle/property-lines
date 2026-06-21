@@ -15,4 +15,4 @@ if [[ -z "${PROPERTY_LINES_CHROME:-}" ]]; then
   fi
 fi
 
-go test -run 'Test(MapRenderSmoke|OfflineShellSmoke|BrowserParcelQuerySmoke)$' -v ./cmd/property-lines "$@"
+go test -run 'Test(MapRenderSmoke|SatelliteBasemapSmoke|OfflineShellSmoke|BrowserParcelQuerySmoke)$' -v ./cmd/property-lines "$@"

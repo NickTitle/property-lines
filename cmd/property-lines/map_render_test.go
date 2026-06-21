@@ -132,6 +132,106 @@ func TestMapRenderSmoke(t *testing.T) {
 	}
 }
 
+func TestSatelliteBasemapSmoke(t *testing.T) {
+	if testing.Short() {
+		t.Skip("satellite basemap smoke test is disabled in short mode")
+	}
+
+	browserPath, err := findBrowserBinary()
+	if err != nil {
+		t.Skipf("satellite basemap smoke test skipped: %v", err)
+	}
+
+	repoRoot, err := resolveRepoRoot()
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+
+	restoreCWD, err := chdir(repoRoot)
+	if err != nil {
+		t.Fatalf("change directory: %v", err)
+	}
+	defer restoreCWD()
+
+	server := httptest.NewServer(newTestMux())
+	defer server.Close()
+
+	artifactDir := filepath.Join(
+		os.TempDir(),
+		"property-lines-satellite-check",
+		time.Now().UTC().Format("20060102-150405"),
+	)
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+		t.Fatalf("create artifact dir: %v", err)
+	}
+	t.Logf("satellite screenshots: %s", artifactDir)
+
+	viewport := viewportSpec{
+		Name:            "satellite",
+		Width:           1440,
+		Height:          900,
+		DeviceScale:     1,
+		Mobile:          false,
+		MinVisibleTiles: 6,
+	}
+
+	allocatorOptions := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath(browserPath),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("hide-scrollbars", true),
+		chromedp.Flag("mute-audio", true),
+	)
+
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocatorOptions...)
+	defer cancelAlloc()
+
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+
+	ctx, cancelTimeout := context.WithTimeout(ctx, 45*time.Second)
+	defer cancelTimeout()
+
+	url := fmt.Sprintf("%s/?satellitecheck=%d", server.URL, time.Now().UnixNano())
+	if err := chromedp.Run(ctx,
+		emulation.SetDeviceMetricsOverride(viewport.Width, viewport.Height, viewport.DeviceScale, viewport.Mobile),
+		chromedp.Navigate(url),
+		chromedp.WaitVisible(`#map`, chromedp.ByID),
+		chromedp.Click(`#satelliteLayerButton`, chromedp.ByID),
+	); err != nil {
+		t.Fatalf("satellite basemap setup failed: %v", err)
+	}
+
+	loaded, broken, sampleSrc, err := waitForSatelliteTiles(ctx, viewport.MinVisibleTiles)
+	if err != nil {
+		t.Fatalf("satellite basemap failed: %v", err)
+	}
+	if broken > 0 {
+		t.Fatalf("satellite basemap has %d broken visible tiles; sample: %s", broken, sampleSrc)
+	}
+	if !strings.Contains(sampleSrc, "/tile/16/") {
+		t.Fatalf("satellite basemap did not use overzoomed native level 16 tiles; sample: %s", sampleSrc)
+	}
+	if loaded < viewport.MinVisibleTiles {
+		t.Fatalf("satellite basemap only loaded %d visible tiles; sample: %s", loaded, sampleSrc)
+	}
+
+	var pngBytes []byte
+	if err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		var err error
+		pngBytes, err = page.CaptureScreenshot().WithFormat(page.CaptureScreenshotFormatPng).Do(ctx)
+		return err
+	})); err != nil {
+		t.Fatalf("capture satellite screenshot failed: %v", err)
+	}
+
+	screenshotPath := filepath.Join(artifactDir, "satellite.png")
+	if err := os.WriteFile(screenshotPath, pngBytes, 0o644); err != nil {
+		t.Fatalf("write satellite screenshot failed: %v", err)
+	}
+}
+
 func TestOfflineShellSmoke(t *testing.T) {
 	if testing.Short() {
 		t.Skip("offline shell smoke test is disabled in short mode")
@@ -506,6 +606,52 @@ func waitForSnapshot(ctx context.Context, viewport viewportSpec, snapshot *viewp
 	}
 
 	return fmt.Errorf("map did not settle: %+v", *snapshot)
+}
+
+func waitForSatelliteTiles(ctx context.Context, minVisibleTiles int) (int, int, string, error) {
+	type satelliteSnapshot struct {
+		Loaded    int    `json:"loaded"`
+		Broken    int    `json:"broken"`
+		SampleSrc string `json:"sampleSrc"`
+	}
+
+	deadline := time.Now().Add(15 * time.Second)
+	last := satelliteSnapshot{}
+	for time.Now().Before(deadline) {
+		const expression = `JSON.stringify((() => {
+			const visibleTiles = Array.from(document.querySelectorAll(".leaflet-tile"))
+				.filter((img) => img.src.includes("basemap.nationalmap.gov"))
+				.filter((img) => {
+					const rect = img.getBoundingClientRect();
+					return rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight;
+				});
+			return {
+				loaded: visibleTiles.filter((img) => img.naturalWidth > 0).length,
+				broken: visibleTiles.filter((img) => img.complete && img.naturalWidth === 0).length,
+				sampleSrc: visibleTiles[0]?.src || "",
+			};
+		})())`
+
+		var raw string
+		if err := chromedp.Run(ctx, chromedp.Evaluate(expression, &raw)); err != nil {
+			return 0, 0, "", err
+		}
+		if err := json.Unmarshal([]byte(raw), &last); err != nil {
+			return 0, 0, "", err
+		}
+		if last.Loaded >= minVisibleTiles {
+			return last.Loaded, last.Broken, last.SampleSrc, nil
+		}
+
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	return last.Loaded, last.Broken, last.SampleSrc, fmt.Errorf(
+		"satellite tiles did not settle (loaded=%d, broken=%d, sample=%q)",
+		last.Loaded,
+		last.Broken,
+		last.SampleSrc,
+	)
 }
 
 func waitForServiceWorkerControl(ctx context.Context) error {

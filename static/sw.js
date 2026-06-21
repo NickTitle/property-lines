@@ -1,4 +1,4 @@
-const appShellCacheName = "property-lines-app-shell-v1";
+const appShellCacheName = "property-lines-app-shell-v2";
 const tileCacheName = "property-lines-tile-cache-v1";
 const appShellAssets = [
   "/",
@@ -69,7 +69,11 @@ function isAppShellRequest(url) {
 }
 
 function isTileRequest(url) {
-  return url.hostname === "tile.openstreetmap.org" || url.hostname.endsWith(".tile.openstreetmap.org");
+  return (
+    url.hostname === "tile.openstreetmap.org" ||
+    url.hostname.endsWith(".tile.openstreetmap.org") ||
+    url.hostname === "basemap.nationalmap.gov"
+  );
 }
 
 function appShellCacheKey(url, request) {

@@ -3,13 +3,33 @@ const nysLayerUrl =
 const demoLayerUrl =
   "https://gis.franklincountyohio.gov/hosting/rest/services/ParcelFeatures/Parcel_Features/FeatureServer/0";
 const serviceUrlStorageKey = "property-lines:serviceUrl";
+const basemapStorageKey = "property-lines:basemap";
 const areaCachePrefix = "property-lines:area-cache:";
 const areaCacheIndexKey = "property-lines:area-cache-index";
 const maxAreaCacheEntries = 8;
 const tileCacheName = "property-lines-tile-cache-v1";
 const tileUrlTemplate = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const satelliteTileUrlTemplate =
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
 const maxTileDownloadCount = 250;
 const defaultPoint = { latitude: 41.933, longitude: -74.0186, source: "New York sample start" };
+const basemaps = {
+  street: {
+    id: "street",
+    label: "Streets",
+    maxZoom: 20,
+    tileUrlTemplate,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+  satellite: {
+    id: "satellite",
+    label: "Satellite",
+    maxNativeZoom: 16,
+    maxZoom: 20,
+    tileUrlTemplate: satelliteTileUrlTemplate,
+    attribution: 'Imagery: <a href="https://www.usgs.gov/">U.S. Geological Survey</a> / The National Map',
+  },
+};
 const automaticParcelSources = [
   {
     name: "NYS Tax Parcels Public",
@@ -43,14 +63,17 @@ const dom = {
   nysButton: document.querySelector("#nysButton"),
   parcelSummary: document.querySelector("#parcelSummary"),
   queryButton: document.querySelector("#queryButton"),
+  satelliteLayerButton: document.querySelector("#satelliteLayerButton"),
   serviceUrlInput: document.querySelector("#serviceUrlInput"),
   sourceStatus: document.querySelector("#sourceStatus"),
+  streetLayerButton: document.querySelector("#streetLayerButton"),
   status: document.querySelector("#status"),
   tileCacheCountInput: document.querySelector("#tileCacheCountInput"),
   tileCacheStatus: document.querySelector("#tileCacheStatus"),
   tileZoomLevelsInput: document.querySelector("#tileZoomLevelsInput"),
 };
 
+let baseMapLayer = null;
 let gpsMarker = null;
 let accuracyCircle = null;
 let parcelLayer = null;
@@ -58,6 +81,7 @@ let selectedLayer = null;
 let gpsWatchId = null;
 let lastGpsFix = null;
 let lastGpsHeading = null;
+let currentBasemapId = readStoredBasemapId();
 let currentPoint = {
   latitude: defaultPoint.latitude,
   longitude: defaultPoint.longitude,
@@ -84,10 +108,7 @@ const map = L.map("map", { zoomControl: false }).setView(
 );
 
 L.control.zoom({ position: "bottomleft" }).addTo(map);
-L.tileLayer(tileUrlTemplate, {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 20,
-}).addTo(map);
+setBasemap(currentBasemapId, { persist: false });
 
 function init() {
   const storedServiceUrl = window.localStorage.getItem(serviceUrlStorageKey) || "";
@@ -104,6 +125,7 @@ function init() {
   updatePoint(currentPoint.latitude, currentPoint.longitude, defaultPoint.source, null, false);
   updateCacheStatus();
   updateSourceStatus();
+  updateBasemapControls();
   void updateTileCacheStatus().catch(() => setTileCacheStatus("Map tile cache status is unavailable."));
   void registerServiceWorker();
 
@@ -117,6 +139,8 @@ function init() {
   dom.clearTileCacheButton.addEventListener("click", clearTileCache);
   dom.demoButton.addEventListener("click", useDemoLayer);
   dom.nysButton.addEventListener("click", useNysParcels);
+  dom.streetLayerButton.addEventListener("click", () => setBasemap("street"));
+  dom.satelliteLayerButton.addEventListener("click", () => setBasemap("satellite"));
   dom.latitudeInput.addEventListener("change", useInputCoordinates);
   dom.longitudeInput.addEventListener("change", useInputCoordinates);
   dom.serviceUrlInput.addEventListener("change", () => {
@@ -133,6 +157,43 @@ function init() {
   });
 
   window.addEventListener("beforeunload", stopGpsTracking);
+}
+
+function readStoredBasemapId() {
+  const stored = window.localStorage.getItem(basemapStorageKey);
+  return Object.prototype.hasOwnProperty.call(basemaps, stored) ? stored : "street";
+}
+
+function getBasemap(id = currentBasemapId) {
+  return basemaps[id] || basemaps.street;
+}
+
+function setBasemap(id, { persist = true } = {}) {
+  const basemap = getBasemap(id);
+  currentBasemapId = basemap.id;
+
+  if (baseMapLayer) {
+    baseMapLayer.remove();
+  }
+
+  baseMapLayer = L.tileLayer(basemap.tileUrlTemplate, {
+    attribution: basemap.attribution,
+    maxNativeZoom: basemap.maxNativeZoom,
+    maxZoom: basemap.maxZoom,
+  }).addTo(map);
+
+  if (persist) {
+    window.localStorage.setItem(basemapStorageKey, basemap.id);
+  }
+
+  updateBasemapControls();
+}
+
+function updateBasemapControls() {
+  dom.streetLayerButton.classList.toggle("is-active", currentBasemapId === "street");
+  dom.satelliteLayerButton.classList.toggle("is-active", currentBasemapId === "satellite");
+  dom.streetLayerButton.setAttribute("aria-pressed", currentBasemapId === "street" ? "true" : "false");
+  dom.satelliteLayerButton.setAttribute("aria-pressed", currentBasemapId === "satellite" ? "true" : "false");
 }
 
 function setStatus(message, tone = "") {
@@ -554,7 +615,7 @@ async function cacheVisibleTiles() {
   }
 
   setBusy(true);
-  setStatus("Downloading map tiles for visible area...");
+  setStatus(`Downloading ${getBasemap().label.toLowerCase()} tiles for visible area...`);
 
   try {
     await registerServiceWorker();
@@ -597,7 +658,7 @@ async function cacheVisibleTiles() {
     }
 
     await updateTileCacheStatus();
-    setStatus(`Map tiles cached. New ${cached}, already cached ${skipped}, failed ${failed}.`, failed ? "error" : "");
+    setStatus(`${getBasemap().label} tiles cached. New ${cached}, already cached ${skipped}, failed ${failed}.`, failed ? "error" : "");
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Map tile cache failed.", "error");
   } finally {
@@ -763,7 +824,7 @@ async function updateTileCacheStatus() {
   const keys = await cache.keys();
   dom.tileCacheCountInput.value = String(keys.length);
   setTileCacheStatus(
-    keys.length ? `${keys.length} OpenStreetMap tile${keys.length === 1 ? "" : "s"} cached.` : "No map tiles cached yet.",
+    keys.length ? `${keys.length} basemap tile${keys.length === 1 ? "" : "s"} cached.` : "No map tiles cached yet.",
   );
 }
 
@@ -870,14 +931,16 @@ function formatBytes(bytes) {
 }
 
 function visibleTileUrls() {
+  const basemap = getBasemap();
   const zoom = Math.round(map.getZoom());
   const zoomLevels = clampNumber(Number(dom.tileZoomLevelsInput.value), 1, 3);
   const bounds = map.getBounds();
   const urls = [];
 
-  for (let currentZoom = zoom; currentZoom < zoom + zoomLevels && currentZoom <= 20; currentZoom += 1) {
-    const northwest = latLngToTile(bounds.getNorth(), bounds.getWest(), currentZoom);
-    const southeast = latLngToTile(bounds.getSouth(), bounds.getEast(), currentZoom);
+  for (let currentZoom = zoom; currentZoom < zoom + zoomLevels && currentZoom <= basemap.maxZoom; currentZoom += 1) {
+    const tileZoom = Math.min(currentZoom, basemap.maxNativeZoom || currentZoom);
+    const northwest = latLngToTile(bounds.getNorth(), bounds.getWest(), tileZoom);
+    const southeast = latLngToTile(bounds.getSouth(), bounds.getEast(), tileZoom);
     const minX = Math.min(northwest.x, southeast.x);
     const maxX = Math.max(northwest.x, southeast.x);
     const minY = Math.min(northwest.y, southeast.y);
@@ -886,8 +949,8 @@ function visibleTileUrls() {
     for (let x = minX; x <= maxX; x += 1) {
       for (let y = minY; y <= maxY; y += 1) {
         urls.push(
-          tileUrlTemplate
-            .replace("{z}", String(currentZoom))
+          basemap.tileUrlTemplate
+            .replace("{z}", String(tileZoom))
             .replace("{x}", String(x))
             .replace("{y}", String(y)),
         );

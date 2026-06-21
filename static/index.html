@@ -12,6 +12,12 @@
     <main class="app-shell">
       <section class="map-stage" aria-label="Property map">
         <div id="map" class="map"></div>
+        <div class="map-toolbar" aria-label="Basemap controls">
+          <div class="segmented-control" role="group" aria-label="Basemap">
+            <button class="segment-button" id="streetLayerButton" type="button">Streets</button>
+            <button class="segment-button" id="satelliteLayerButton" type="button">Satellite</button>
+          </div>
+        </div>
         <div class="map-status" id="status">Ready. Use GPS or query from the map center.</div>
       </section>
 

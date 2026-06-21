@@ -2,19 +2,19 @@
 
 A small GPS-first parcel viewer for checking approximate property boundaries.
 
-The app uses browser geolocation, OpenStreetMap base tiles, and a server-side
-ArcGIS FeatureServer/MapServer parcel-layer adapter. It can choose a known
-public parcel layer from the current location, or query a manually supplied
-county or city parcel layer through the local server and display the matching
-parcel geometry and attributes.
+The app uses browser geolocation, switchable street and satellite basemaps, and
+a server-side ArcGIS FeatureServer/MapServer parcel-layer adapter. It can
+choose a known public parcel layer from the current location, or query a
+manually supplied county or city parcel layer through the local server and
+display the matching parcel geometry and attributes.
 
 Visible map areas can be downloaded into browser `localStorage` for later use.
 The cache stores the parcel GeoJSON returned by the active ArcGIS source and is
 kept to a small rolling set of areas because browser storage is limited.
 
-OpenStreetMap basemap tiles can also be cached for the visible map. Tile
-caching uses the browser Cache Storage API plus a service worker, which lets the
-app serve cached tiles when the network is unavailable.
+Basemap tiles can also be cached for the visible map. Tile caching uses the
+browser Cache Storage API plus a service worker, which lets the app serve
+cached tiles when the network is unavailable.
 
 The app shell itself is also precached by the service worker, so after one
 successful online load the UI can reopen with no network, including airplane
@@ -96,8 +96,8 @@ accidentally pulling huge parcel datasets into browser storage.
 3. Click `Cache Map Tiles`.
 
 The app caps explicit tile downloads to avoid accidentally bulk-downloading map
-tiles. Browsed OpenStreetMap tiles are also cached opportunistically by the
-service worker.
+tiles. Browsed basemap tiles are also cached opportunistically by the service
+worker.
 
 ## Airplane Mode
 
